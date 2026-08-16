@@ -1,6 +1,6 @@
 --[[
     BANKROLL.SOSU | Mobile HvH Suite
-    Optimized for Mobile Executors (Delta, Hydrogen, Arceus X, Codex)
+    Optimized for Mobile Executors (Delta, Hydrogen, Codex, Arceus X)
     Full HvH Feature Set with Mobile Optimization & Modern UI
 --]]
 
@@ -18,19 +18,19 @@ local Stats = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local Camera = Workspace.CurrentCamera
 
--- Mobile / Executor UI Parent Setup
+-- Parent GUI setup with safe execution for Mobile Executors
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BankrollGui_" .. math.random(1000, 9999)
 ScreenGui.ResetOnSpawn = false
 
-local function ParentToUI()
+local function ParentScreenGui()
     if gethui then
-        local ok = pcall(function() ScreenGui.Parent = gethui() end)
-        if ok and ScreenGui.Parent then return end
+        local success = pcall(function() ScreenGui.Parent = gethui() end)
+        if success and ScreenGui.Parent then return end
     end
 
-    local okCore = pcall(function() ScreenGui.Parent = CoreGui end)
-    if okCore and ScreenGui.Parent then return end
+    local successCore = pcall(function() ScreenGui.Parent = CoreGui end)
+    if successCore and ScreenGui.Parent then return end
 
     local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui", 5)
     if playerGui then
@@ -38,27 +38,34 @@ local function ParentToUI()
     end
 end
 
-ParentToUI()
+ParentScreenGui()
 
 ---------------------------------------------------------
--- SETTINGS & CONFIGURATION STATE
+-- PRESETS CATALOG & STATE CONFIG
 ---------------------------------------------------------
 
-local Presets = {
-    Skybox = {
-        ["Purple Nebula"] = "rbxassetid://159454299",
-        ["Space Stars"]   = "rbxassetid://266205510",
-        ["Night City"]    = "rbxassetid://12064107",
-        ["Cyber Red"]     = "rbxassetid://252765781"
-    },
-    Sounds = {
-        ["SAMP bell"]  = "rbxassetid://13510737",
-        ["Skeet"]      = "rbxassetid://566585149",
-        ["Neverlose"]  = "rbxassetid://656667534",
-        ["Стон тянки"] = "rbxassetid://1676645367",
-        ["Click"]      = "rbxassetid://12221967",
-        ["CS Headshot"]= "rbxassetid://143242095"
-    }
+local SkyboxPresets = {
+    ["Purple Nebula"] = "rbxassetid://159454299",
+    ["Space Stars"]   = "rbxassetid://266205510",
+    ["Night City"]    = "rbxassetid://12064107",
+    ["Cyber Red"]     = "rbxassetid://252765781"
+}
+
+local MaskPresets = {
+    ["Payday Clown"]  = 142491170,
+    ["Dallas Payday"] = 142491152,
+    ["Dallas USA"]    = 143187121,
+    ["Skull Payday"]   = 142491136,
+    ["Dallas Classic"] = 143187140
+}
+
+local HitSounds = {
+    ["SAMP bell"]  = "rbxassetid://13510737",
+    ["Skeet"]      = "rbxassetid://566585149",
+    ["Neverlose"]  = "rbxassetid://656667534",
+    ["Стон тянки"] = "rbxassetid://1676645367",
+    ["Click"]      = "rbxassetid://12221967",
+    ["CS Headshot"]= "rbxassetid://143242095"
 }
 
 local Config = {
@@ -70,7 +77,9 @@ local Config = {
         TargetPart = "Head",          -- Head, Chest, Pelvis
         FOV = 180,
         ShowFOVCircle = true,
-        AutoStop = true
+        MinDamage = 25,
+        AutoStop = true,
+        Multipoint = true
     },
     AntiAim = {
         Enabled = true,
@@ -79,6 +88,9 @@ local Config = {
         Pitch = "down",              -- down, up, zero
         SpinSpeed = 20,
         JitterRange = 45,
+        FakeLag = true,
+        FakeLagLimit = 8,
+        FakeDuck = false,
         InvertSide = false,
         ManualDir = "Back"            -- Left, Right, Back
     },
@@ -100,11 +112,13 @@ local Config = {
         HitSound = true,
         HitSoundType = "SAMP bell",
         CustomSkybox = false,
-        SkyboxType = "Purple Nebula"
+        SkyboxType = "Purple Nebula",
+        CustomMask = false,
+        MaskType = "Payday Clown"
     },
     UI = {
         Font = "Code",
-        ThemeAccent = Color3.fromRGB(160, 30, 240),
+        ThemeAccent = Color3.fromRGB(140, 30, 220),
         MainBg = Color3.fromRGB(15, 15, 15),
         TopBarBg = Color3.fromRGB(20, 20, 20),
         Border = Color3.fromRGB(40, 40, 40),
@@ -300,7 +314,7 @@ local VisTab  = Instance.new("Frame"); VisTab.Size = UDim2.new(1,0,1,0); VisTab.
 local CfgTab  = Instance.new("Frame"); CfgTab.Size = UDim2.new(1,0,1,0); CfgTab.BackgroundTransparency = 1; CfgTab.Visible = false; CfgTab.Parent = ContentArea
 
 ---------------------------------------------------------
--- HELPER UI CREATORS
+-- HELPER UI CREATORS (FIXED LAYOUT CONTAINER)
 ---------------------------------------------------------
 
 local function CreateGroupBox(parent, title, pos, size)
@@ -318,11 +332,18 @@ local function CreateGroupBox(parent, title, pos, size)
     Label.Position = UDim2.new(0, 10, 0, -8); Label.BackgroundColor3 = Config.UI.MainBg
     Label.Text = " " .. title .. " "; Label.TextColor3 = Config.UI.TextDim; Label.TextSize = 10; Label.Font = Enum.Font.Code
     Label.AutomaticSize = Enum.AutomaticSize.X; Label.Size = UDim2.new(0, 0, 0, 14)
+    Label.ZIndex = 2
     Label.Parent = Box
 
-    local Layout = Instance.new("UIListLayout"); Layout.Parent = Box; Layout.SortOrder = Enum.SortOrder.LayoutOrder; Layout.Padding = UDim.new(0, 5)
-    local Padding = Instance.new("UIPadding"); Padding.Parent = Box; Padding.PaddingTop = UDim.new(0, 10); Padding.PaddingLeft = UDim.new(0, 8); Padding.PaddingRight = UDim.new(0, 8)
-    return Box
+    local ContentContainer = Instance.new("Frame")
+    ContentContainer.Name = "Content"
+    ContentContainer.Size = UDim2.new(1, -16, 1, -16)
+    ContentContainer.Position = UDim2.new(0, 8, 0, 10)
+    ContentContainer.BackgroundTransparency = 1
+    ContentContainer.Parent = Box
+
+    local Layout = Instance.new("UIListLayout"); Layout.Parent = ContentContainer; Layout.SortOrder = Enum.SortOrder.LayoutOrder; Layout.Padding = UDim.new(0, 5)
+    return ContentContainer
 end
 
 local function CreateToggle(parent, text, defaultState, callback)
@@ -442,10 +463,12 @@ CreateToggle(RageMain, "auto shoot", Config.Ragebot.AutoShoot, function(v) Confi
 CreateToggle(RageMain, "silent aim", Config.Ragebot.SilentAim, function(v) Config.Ragebot.SilentAim = v end)
 CreateToggle(RageMain, "show fov circle", Config.Ragebot.ShowFOVCircle, function(v) Config.Ragebot.ShowFOVCircle = v end)
 CreateSlider(RageMain, "fov angle", 10, 360, Config.Ragebot.FOV, function(v) Config.Ragebot.FOV = v end)
+CreateSlider(RageMain, "min damage", 1, 100, Config.Ragebot.MinDamage, function(v) Config.Ragebot.MinDamage = v end)
 
 local RageTarget = CreateGroupBox(RageTab, "targeting", UDim2.new(0.52, 0, 0, 0), UDim2.new(0.48, 0, 1, 0))
 CreateSelector(RageTarget, "target sel", {"Distance", "Health", "FOV"}, Config.Ragebot.TargetSelection, function(v) Config.Ragebot.TargetSelection = v end)
 CreateSelector(RageTarget, "hitbox", {"Head", "Chest", "Pelvis"}, Config.Ragebot.TargetPart, function(v) Config.Ragebot.TargetPart = v end)
+CreateToggle(RageTarget, "multipoint", Config.Ragebot.Multipoint, function(v) Config.Ragebot.Multipoint = v end)
 CreateToggle(RageTarget, "auto stop", Config.Ragebot.AutoStop, function(v) Config.Ragebot.AutoStop = v end)
 
 -- 2. Anti-Aim Tab
@@ -458,6 +481,8 @@ CreateSelector(AAMain, "pitch", {"down", "up", "zero"}, Config.AntiAim.Pitch, fu
 local AASpeed = CreateGroupBox(AATab, "anti-aim settings", UDim2.new(0.52, 0, 0, 0), UDim2.new(0.48, 0, 1, 0))
 CreateSlider(AASpeed, "spin speed", 5, 60, Config.AntiAim.SpinSpeed, function(v) Config.AntiAim.SpinSpeed = v end)
 CreateSlider(AASpeed, "jitter range", 10, 180, Config.AntiAim.JitterRange, function(v) Config.AntiAim.JitterRange = v end)
+CreateToggle(AASpeed, "fake lag", Config.AntiAim.FakeLag, function(v) Config.AntiAim.FakeLag = v end)
+CreateSlider(AASpeed, "lag ticks", 1, 14, Config.AntiAim.FakeLagLimit, function(v) Config.AntiAim.FakeLagLimit = v end)
 
 -- 3. Movement Tab
 local MoveMain = CreateGroupBox(MoveTab, "movement main", UDim2.new(0, 0, 0, 0), UDim2.new(0.48, 0, 1, 0))
@@ -482,7 +507,7 @@ CreateToggle(MoveExploits, "3rd person", Config.Movement.ThirdPerson, function(v
 end)
 
 -- Forward decls for world effects
-local updateSkybox
+local updateSkybox, updateMask
 
 -- 4. Visuals Tab
 local VisIndicators = CreateGroupBox(VisTab, "esp & visuals", UDim2.new(0, 0, 0, 0), UDim2.new(0.48, 0, 1, 0))
@@ -511,6 +536,15 @@ end)
 CreateSelector(VisWorld, "skybox type", {"Purple Nebula", "Space Stars", "Night City", "Cyber Red"}, Config.Visuals.SkyboxType, function(v)
     Config.Visuals.SkyboxType = v
     if Config.Visuals.CustomSkybox and updateSkybox then updateSkybox() end
+end)
+
+CreateToggle(VisWorld, "payday mask", Config.Visuals.CustomMask, function(v)
+    Config.Visuals.CustomMask = v
+    if updateMask then updateMask() end
+end)
+CreateSelector(VisWorld, "mask model", {"Payday Clown", "Dallas Payday", "Dallas USA", "Skull Payday", "Dallas Classic"}, Config.Visuals.MaskType, function(v)
+    Config.Visuals.MaskType = v
+    if Config.Visuals.CustomMask and updateMask then updateMask() end
 end)
 
 ---------------------------------------------------------
@@ -725,6 +759,8 @@ end)
 ---------------------------------------------------------
 
 local currentAngle = 0
+local lagCount = 0
+
 RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -733,6 +769,17 @@ RunService.RenderStepped:Connect(function()
     if root and hum and hum.Health > 0 then
         if Config.AntiAim.Enabled then
             hum.AutoRotate = false
+
+            if Config.AntiAim.FakeLag then
+                lagCount = (lagCount + 1) % Config.AntiAim.FakeLagLimit
+                if lagCount ~= 0 then
+                    root.Anchored = true
+                else
+                    root.Anchored = false
+                end
+            else
+                root.Anchored = false
+            end
 
             local baseYaw = Config.AntiAim.InvertSide and 90 or -90
             if Config.AntiAim.BaseDirection == "forward" then baseYaw = 0
@@ -761,6 +808,7 @@ RunService.RenderStepped:Connect(function()
                 * CFrame.Angles(0, camYaw + math.rad(finalYaw), 0)
                 * CFrame.Angles(math.rad(pitchAngle), 0, 0)
         else
+            root.Anchored = false
             hum.AutoRotate = true
         end
     end
@@ -924,7 +972,7 @@ for _, p in pairs(Players:GetPlayers()) do ApplyChams(p) end
 Players.PlayerAdded:Connect(ApplyChams)
 
 ---------------------------------------------------------
--- SKYBOX ENGINE
+-- SKYBOX ENGINE & PAYDAY MASK
 ---------------------------------------------------------
 
 local currentSky = nil
@@ -935,7 +983,7 @@ updateSkybox = function()
             currentSky.Name = "BankrollSkybox"
             currentSky.Parent = Lighting
         end
-        local assetId = Presets.Skybox[Config.Visuals.SkyboxType]
+        local assetId = SkyboxPresets[Config.Visuals.SkyboxType]
         if assetId then
             currentSky.SkyboxBk = assetId
             currentSky.SkyboxDn = assetId
@@ -952,6 +1000,57 @@ updateSkybox = function()
     end
 end
 
+local currentMaskModel = nil
+local function removeMask()
+    if currentMaskModel then
+        pcall(function() currentMaskModel:Destroy() end)
+        currentMaskModel = nil
+    end
+end
+
+updateMask = function()
+    removeMask()
+
+    if not Config.Visuals.CustomMask then return end
+
+    local char = LocalPlayer.Character
+    local head = char and char:FindFirstChild("Head")
+    local assetId = MaskPresets[Config.Visuals.MaskType]
+    if not head or not assetId then return end
+
+    task.spawn(function()
+        local success, rawObjects = pcall(function()
+            if getobjects then return getobjects("rbxassetid://" .. tostring(assetId)) end
+            if game.GetObjects then return game:GetObjects("rbxassetid://" .. tostring(assetId)) end
+        end)
+
+        if success and rawObjects and #rawObjects > 0 and LocalPlayer.Character == char then
+            local maskObj = rawObjects[1]
+            if maskObj then
+                maskObj.Name = "BankrollPaydayMask"
+                local handle = maskObj:IsA("Accessory") and maskObj:FindFirstChild("Handle")
+                    or maskObj:IsA("BasePart") and maskObj
+                    or maskObj:FindFirstChildOfClass("BasePart")
+
+                if handle then
+                    handle.CanCollide = false
+                    if maskObj:IsA("Accessory") then
+                        maskObj.Parent = char
+                    else
+                        local weld = Instance.new("Weld")
+                        weld.Part0 = head
+                        weld.Part1 = handle
+                        weld.C0 = CFrame.new(0, 0, -0.1)
+                        weld.Parent = handle
+                        maskObj.Parent = char
+                    end
+                    currentMaskModel = maskObj
+                end
+            end
+        end
+    end)
+end
+
 ---------------------------------------------------------
 -- HIT SOUND ENGINE
 ---------------------------------------------------------
@@ -965,7 +1064,7 @@ local function TrackPlayerCharacter(char)
     local lastHealth = hum.Health
     hum.HealthChanged:Connect(function(health)
         if Config.Visuals.HitSound and health < lastHealth then
-            local soundId = Presets.Sounds[Config.Visuals.HitSoundType]
+            local soundId = HitSounds[Config.Visuals.HitSoundType]
             if soundId then
                 HitSound.SoundId = soundId
                 HitSound:Play()

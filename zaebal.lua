@@ -1,32 +1,30 @@
 -- Services
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
+local InsertService = game:GetService("InsertService")
 
-local LocalPlayer = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local Camera = Workspace.CurrentCamera
 
--- Delta Specific GUI Parent Handling
+-- Delta / Mobile Executor Specific GUI Parent Handling
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BankrollGui_" .. math.random(1000, 9999)
 ScreenGui.ResetOnSpawn = false
 
 local function ParentToUI()
-    -- 1. Попытка через специфичную для Delta функцию gethui()
     if gethui then
-        local success, err = pcall(function()
-            ScreenGui.Parent = gethui()
-        end)
+        local success = pcall(function() ScreenGui.Parent = gethui() end)
         if success and ScreenGui.Parent then return end
     end
 
-    -- 2. Попытка через CoreGui
-    local successCore = pcall(function()
-        ScreenGui.Parent = CoreGui
-    end)
+    local successCore = pcall(function() ScreenGui.Parent = CoreGui end)
     if successCore and ScreenGui.Parent then return end
 
-    -- 3. Резервный вариант (PlayerGui)
     local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui", 5)
     if playerGui then
         ScreenGui.Parent = playerGui
@@ -34,6 +32,31 @@ local function ParentToUI()
 end
 
 ParentToUI()
+
+-- Presets Catalog
+local SkyboxPresets = {
+    ["Purple Nebula"] = "rbxassetid://159454299",
+    ["Space Stars"]   = "rbxassetid://266205510",
+    ["Night City"]    = "rbxassetid://12064107",
+    ["Cyber Red"]     = "rbxassetid://252765781"
+}
+
+local MaskPresets = {
+    ["Payday Clown"] = 142491170,
+    ["Dallas Payday"] = 142491152,
+    ["Dallas USA"]   = 143187121,
+    ["Skull Payday"]  = 142491136,
+    ["Dallas Classic"] = 143187140
+}
+
+local HitSounds = {
+    ["SAMP bell"] = "rbxassetid://13510737",
+    ["Skeet"] = "rbxassetid://566585149",
+    ["Neverlose"] = "rbxassetid://656667534",
+    ["Стон тянки"] = "rbxassetid://1676645367",
+    ["Click"] = "rbxassetid://12221967",
+    ["CS Headshot"] = "rbxassetid://143242095"
+}
 
 -- Theme Config
 local DarkTheme = {
@@ -47,12 +70,58 @@ local DarkTheme = {
 }
 
 -- Settings State
-local RagebotSettings = { AutoShoot = true, AutoWall = true, MinDamage = 25, AutoStop = true, TargetPart = "Head", Multipoint = true }
-local AntiAimSettings = { Enabled = true, Style = "spin", BaseDirection = "backwards", Pitch = "down", FakeLag = true, FakeLagLimit = 8, Freestanding = true, FakeDuck = false, InvertSide = false }
-local RageSettings = { StrafeSpeed = 32, BunnyHop = true, ThirdPerson = false, NoClip = false, PixelSurf = false, InfiniteJump = false, AntiVoid = true }
-local VisualsSettings = { Box = true, Skeleton = true, Nickname = true, BulletTracers = true, Hitmarkers = true, AAIndicators = true, HitSound = true, HitSoundType = "SAMP bell", CustomSkybox = false, SkyboxType = "Purple Nebula", CustomMask = false, MaskType = "Payday Clown" }
+local RagebotSettings = {
+    AutoShoot = true,
+    AutoWall = true,
+    MinDamage = 25,
+    AutoStop = true,
+    TargetPart = "Head",
+    Multipoint = true
+}
 
--- Watermark Toggle
+local AntiAimSettings = {
+    Enabled = true,
+    Style = "spin",
+    BaseDirection = "backwards",
+    Pitch = "down",
+    FakeLag = true,
+    FakeLagLimit = 8,
+    Freestanding = true,
+    FakeDuck = false,
+    InvertSide = false
+}
+
+local RageSettings = {
+    StrafeSpeed = 32,
+    BunnyHop = true,
+    ThirdPerson = false,
+    NoClip = false,
+    PixelSurf = false,
+    InfiniteJump = false,
+    AntiVoid = true
+}
+
+local VisualsSettings = {
+    Box = true,
+    Skeleton = true,
+    Nickname = true,
+    BulletTracers = true,
+    Hitmarkers = true,
+    AAIndicators = true,
+    HitSound = true,
+    HitSoundType = "SAMP bell",
+    CustomSkybox = false,
+    SkyboxType = "Purple Nebula",
+    CustomMask = false,
+    MaskType = "Payday Clown"
+}
+
+local MenuSettings = {
+    SelectedFont = "Code",
+    TGLink = "https://t.me/bankrollc"
+}
+
+-- Watermark / HUD Toggle Button
 local Watermark = Instance.new("TextButton")
 Watermark.Name = "WatermarkToggle"
 Watermark.Position = UDim2.new(0, 15, 0, 15)
@@ -71,7 +140,7 @@ local WmPadding = Instance.new("UIPadding")
 WmPadding.PaddingLeft = UDim.new(0, 8)
 WmPadding.Parent = Watermark
 
--- Main Frame Setup
+-- Main GUI Window
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 520, 0, 360)
@@ -97,7 +166,7 @@ TopBar.Parent = MainFrame
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Size = UDim2.new(1, 0, 1, 0)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "bankroll | mobile hvh edition (Delta Fix)"
+TitleLabel.Text = "bankroll | mobile hvh edition"
 TitleLabel.TextColor3 = DarkTheme.Accent
 TitleLabel.TextSize = 14
 TitleLabel.Font = DarkTheme.Font
@@ -117,14 +186,14 @@ ContentArea.Position = UDim2.new(0, 10, 0, 30)
 ContentArea.BackgroundTransparency = 1
 ContentArea.Parent = MainFrame
 
--- Create Tab Frames
+-- Tab Frames
 local RagebotTab = Instance.new("Frame"); RagebotTab.Size = UDim2.new(1,0,1,0); RagebotTab.BackgroundTransparency = 1; RagebotTab.Visible = true; RagebotTab.Parent = ContentArea
 local AntiAimTab = Instance.new("Frame"); AntiAimTab.Size = UDim2.new(1,0,1,0); AntiAimTab.BackgroundTransparency = 1; AntiAimTab.Visible = false; AntiAimTab.Parent = ContentArea
 local MovementTab = Instance.new("Frame"); MovementTab.Size = UDim2.new(1,0,1,0); MovementTab.BackgroundTransparency = 1; MovementTab.Visible = false; MovementTab.Parent = ContentArea
 local VisualsTab = Instance.new("Frame"); VisualsTab.Size = UDim2.new(1,0,1,0); VisualsTab.BackgroundTransparency = 1; VisualsTab.Visible = false; VisualsTab.Parent = ContentArea
 local SettingsTab = Instance.new("Frame"); SettingsTab.Size = UDim2.new(1,0,1,0); SettingsTab.BackgroundTransparency = 1; SettingsTab.Visible = false; SettingsTab.Parent = ContentArea
 
--- Helper Functions UI
+-- Helper UI Functions
 local function CreateGroupBox(parent, title, pos, size)
     local Box = Instance.new("Frame")
     Box.Position = pos; Box.Size = size
@@ -135,7 +204,8 @@ local function CreateGroupBox(parent, title, pos, size)
     local Label = Instance.new("TextLabel")
     Label.Position = UDim2.new(0, 10, 0, -8); Label.BackgroundColor3 = DarkTheme.MainBg
     Label.Text = " " .. title .. " "; Label.TextColor3 = DarkTheme.TextDim; Label.TextSize = 11; Label.Font = DarkTheme.Font
-    Label.Size = UDim2.new(0, 100, 0, 14)
+    Label.AutomaticSize = Enum.AutomaticSize.X
+    Label.Size = UDim2.new(0, 0, 0, 14)
     Label.Parent = Box
 
     local Layout = Instance.new("UIListLayout"); Layout.Parent = Box; Layout.SortOrder = Enum.SortOrder.LayoutOrder; Layout.Padding = UDim.new(0, 5)
@@ -222,7 +292,7 @@ local function CreateSelector(parent, labelText, options, defaultOption, callbac
     end)
 end
 
--- Tab Management
+-- Tab Switcher
 local tabs = {
     {Name = "ragebot", Frame = RagebotTab},
     {Name = "anti-aim", Frame = AntiAimTab},
@@ -245,7 +315,7 @@ for i, tab in ipairs(tabs) do
     end)
 end
 
--- Fill Ragebot
+-- 1. Ragebot Tab
 local MainRage = CreateGroupBox(RagebotTab, "ragebot main", UDim2.new(0, 0, 0, 0), UDim2.new(0.48, 0, 1, 0))
 CreateToggle(MainRage, "auto shoot", RagebotSettings.AutoShoot, function(v) RagebotSettings.AutoShoot = v end)
 CreateToggle(MainRage, "auto wall", RagebotSettings.AutoWall, function(v) RagebotSettings.AutoWall = v end)
@@ -256,7 +326,7 @@ local TargetRage = CreateGroupBox(RagebotTab, "target settings", UDim2.new(0.52,
 CreateSelector(TargetRage, "hitbox", {"Head", "Chest", "Pelvis"}, RagebotSettings.TargetPart, function(v) RagebotSettings.TargetPart = v end)
 CreateToggle(TargetRage, "multipoint", RagebotSettings.Multipoint, function(v) RagebotSettings.Multipoint = v end)
 
--- Fill Anti-Aim
+-- 2. Anti-Aim Tab
 local AAMain = CreateGroupBox(AntiAimTab, "anti-aim", UDim2.new(0, 0, 0, 0), UDim2.new(0.48, 0, 1, 0))
 CreateToggle(AAMain, "enabled", AntiAimSettings.Enabled, function(v) AntiAimSettings.Enabled = v end)
 CreateSelector(AAMain, "style", {"spin", "left-right", "jitter"}, AntiAimSettings.Style, function(v) AntiAimSettings.Style = v end)
@@ -267,25 +337,213 @@ local AADesync = CreateGroupBox(AntiAimTab, "desync & fakelag", UDim2.new(0.52, 
 CreateToggle(AADesync, "freestanding", AntiAimSettings.Freestanding, function(v) AntiAimSettings.Freestanding = v end)
 CreateToggle(AADesync, "fake lag", AntiAimSettings.FakeLag, function(v) AntiAimSettings.FakeLag = v end)
 CreateSlider(AADesync, "lag ticks", 1, 14, AntiAimSettings.FakeLagLimit, function(v) AntiAimSettings.FakeLagLimit = v end)
+CreateToggle(AADesync, "fake duck", AntiAimSettings.FakeDuck, function(v) AntiAimSettings.FakeDuck = v end)
 
--- Fill Movement
+-- 3. Movement Tab
 local MoveBox = CreateGroupBox(MovementTab, "movement", UDim2.new(0, 0, 0, 0), UDim2.new(0.48, 0, 1, 0))
 CreateSlider(MoveBox, "strafe speed", 16, 120, RageSettings.StrafeSpeed, function(v) RageSettings.StrafeSpeed = v end)
 CreateToggle(MoveBox, "bunny hop", RageSettings.BunnyHop, function(v) RageSettings.BunnyHop = v end)
+CreateToggle(MoveBox, "pixel surf", RageSettings.PixelSurf, function(v) RageSettings.PixelSurf = v end)
 
 local ExploitBox = CreateGroupBox(MovementTab, "exploits", UDim2.new(0.52, 0, 0, 0), UDim2.new(0.48, 0, 1, 0))
+CreateToggle(ExploitBox, "3rd person", RageSettings.ThirdPerson, function(v)
+    RageSettings.ThirdPerson = v
+    if not v then LocalPlayer.CameraMaxZoomDistance = 0.5 else LocalPlayer.CameraMaxZoomDistance = 128; LocalPlayer.CameraMinZoomDistance = 10 end
+end)
 CreateToggle(ExploitBox, "noclip", RageSettings.NoClip, function(v) RageSettings.NoClip = v end)
 CreateToggle(ExploitBox, "anti-void", RageSettings.AntiVoid, function(v) RageSettings.AntiVoid = v end)
 
--- Fill Visuals
+-- Forward declarations for Skybox and Mask updating functions
+local updateSkybox, updateMask
+
+-- 4. Visuals Tab
 local VisBox = CreateGroupBox(VisualsTab, "hvh indicators", UDim2.new(0, 0, 0, 0), UDim2.new(0.48, 0, 1, 0))
 CreateToggle(VisBox, "box esp", VisualsSettings.Box, function(v) VisualsSettings.Box = v end)
 CreateToggle(VisBox, "aa indicators", VisualsSettings.AAIndicators, function(v) VisualsSettings.AAIndicators = v end)
+CreateToggle(VisBox, "bullet tracers", VisualsSettings.BulletTracers, function(v) VisualsSettings.BulletTracers = v end)
+CreateToggle(VisBox, "hit sound", VisualsSettings.HitSound, function(v) VisualsSettings.HitSound = v end)
+CreateSelector(VisBox, "sound", {"SAMP bell", "Skeet", "Neverlose", "Стон тянки", "Click", "CS Headshot"}, VisualsSettings.HitSoundType, function(v) VisualsSettings.HitSoundType = v end)
 
--- Mobile Inverter Button
+local WorldBox = CreateGroupBox(VisualsTab, "world & player", UDim2.new(0.52, 0, 0, 0), UDim2.new(0.48, 0, 1, 0))
+CreateToggle(WorldBox, "custom skybox", VisualsSettings.CustomSkybox, function(v)
+    VisualsSettings.CustomSkybox = v
+    if updateSkybox then updateSkybox() end
+end)
+CreateSelector(WorldBox, "skybox type", {"Purple Nebula", "Space Stars", "Night City", "Cyber Red"}, VisualsSettings.SkyboxType, function(v)
+    VisualsSettings.SkyboxType = v
+    if VisualsSettings.CustomSkybox and updateSkybox then updateSkybox() end
+end)
+
+CreateToggle(WorldBox, "payday mask", VisualsSettings.CustomMask, function(v)
+    VisualsSettings.CustomMask = v
+    if updateMask then updateMask() end
+end)
+CreateSelector(WorldBox, "mask model", {"Payday Clown", "Dallas Payday", "Dallas USA", "Skull Payday", "Dallas Classic"}, VisualsSettings.MaskType, function(v)
+    VisualsSettings.MaskType = v
+    if VisualsSettings.CustomMask and updateMask then updateMask() end
+end)
+
+-- 5. Settings Tab
+local UIConfigBox = CreateGroupBox(SettingsTab, "ui settings", UDim2.new(0, 0, 0, 0), UDim2.new(0.48, 0, 1, 0))
+CreateSelector(UIConfigBox, "font", {"Code", "SourceSansBold", "GothamBold", "Arcade"}, MenuSettings.SelectedFont, function(selected)
+    MenuSettings.SelectedFont = selected
+    local fontEnum = Enum.Font[selected] or Enum.Font.Code
+    for _, obj in ipairs(ScreenGui:GetDescendants()) do
+        if obj:IsA("TextLabel") or obj:IsA("TextButton") then obj.Font = fontEnum end
+    end
+end)
+
+CreateSelector(UIConfigBox, "menu size", {"Medium", "Small", "Large"}, "Medium", function(size)
+    if size == "Small" then
+        MainFrame.Size = UDim2.new(0, 420, 0, 290)
+    elseif size == "Medium" then
+        MainFrame.Size = UDim2.new(0, 520, 0, 360)
+    elseif size == "Large" then
+        MainFrame.Size = UDim2.new(0, 620, 0, 430)
+    end
+end)
+
+local CommunityBox = CreateGroupBox(SettingsTab, "community", UDim2.new(0.52, 0, 0, 0), UDim2.new(0.48, 0, 1, 0))
+local TGLabel = Instance.new("TextLabel")
+TGLabel.Size = UDim2.new(1, 0, 0, 18); TGLabel.BackgroundTransparency = 1
+TGLabel.Text = "Telegram: @bankrollc"; TGLabel.TextColor3 = DarkTheme.Text; TGLabel.TextSize = 11; TGLabel.Font = DarkTheme.Font; TGLabel.TextXAlignment = Enum.TextXAlignment.Left; TGLabel.Parent = CommunityBox
+
+local CopyBtn = Instance.new("TextButton")
+CopyBtn.Size = UDim2.new(1, 0, 0, 22); CopyBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 25); CopyBtn.BorderColor3 = DarkTheme.Border; CopyBtn.BorderSizePixel = 1
+CopyBtn.Text = "Copy TG Link"; CopyBtn.TextColor3 = DarkTheme.Accent; CopyBtn.TextSize = 11; CopyBtn.Font = DarkTheme.Font; CopyBtn.Parent = CommunityBox
+
+CopyBtn.MouseButton1Click:Connect(function()
+    if setclipboard then
+        setclipboard(MenuSettings.TGLink)
+        CopyBtn.Text = "Copied!"
+        task.wait(1.5)
+        CopyBtn.Text = "Copy TG Link"
+    end
+end)
+
+---------------------------------------------------------
+-- SKYBOX & PAYDAY MASK ENGINE
+---------------------------------------------------------
+
+local currentSky = nil
+updateSkybox = function()
+    if VisualsSettings.CustomSkybox then
+        if not currentSky then
+            currentSky = Instance.new("Sky")
+            currentSky.Name = "BankrollSkybox"
+            currentSky.Parent = Lighting
+        end
+        local assetId = SkyboxPresets[VisualsSettings.SkyboxType]
+        if assetId then
+            currentSky.SkyboxBk = assetId
+            currentSky.SkyboxDn = assetId
+            currentSky.SkyboxFt = assetId
+            currentSky.SkyboxLf = assetId
+            currentSky.SkyboxRt = assetId
+            currentSky.SkyboxUp = assetId
+        end
+    else
+        if currentSky then
+            currentSky:Destroy()
+            currentSky = nil
+        end
+    end
+end
+
+local currentMaskModel = nil
+local function removeMask()
+    if currentMaskModel then
+        pcall(function() currentMaskModel:Destroy() end)
+        currentMaskModel = nil
+    end
+end
+
+updateMask = function()
+    removeMask()
+
+    if not VisualsSettings.CustomMask then return end
+
+    local char = LocalPlayer.Character
+    local head = char and char:FindFirstChild("Head")
+    local assetId = MaskPresets[VisualsSettings.MaskType]
+    if not head or not assetId then return end
+
+    task.spawn(function()
+        local success, maskObj = pcall(function()
+            if InsertService then
+                return InsertService:LoadAsset(assetId)
+            end
+        end)
+
+        if success and maskObj and LocalPlayer.Character == char then
+            maskObj.Name = "BankrollPaydayMask"
+            local realItem = maskObj:FindFirstChildOfClass("Accessory") or maskObj:FindFirstChildOfClass("Model") or maskObj
+            local handle = realItem:FindFirstChild("Handle") or realItem:FindFirstChildOfClass("BasePart")
+
+            if handle then
+                handle.CanCollide = false
+                if realItem:IsA("Accessory") then
+                    realItem.Parent = char
+                else
+                    local weld = Instance.new("Weld")
+                    weld.Part0 = head
+                    weld.Part1 = handle
+                    weld.C0 = CFrame.new(0, 0, -0.1)
+                    weld.Parent = handle
+                    realItem.Parent = char
+                end
+                currentMaskModel = realItem
+            end
+        end
+    end)
+end
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    if VisualsSettings.CustomMask then updateMask() end
+end)
+
+---------------------------------------------------------
+-- HIT SOUND ENGINE
+---------------------------------------------------------
+
+local HitSound = Instance.new("Sound")
+HitSound.Parent = Workspace
+
+local function TrackPlayerCharacter(char)
+    local hum = char:WaitForChild("Humanoid", 5)
+    if not hum then return end
+    local lastHealth = hum.Health
+    hum.HealthChanged:Connect(function(health)
+        if VisualsSettings.HitSound and health < lastHealth then
+            local soundId = HitSounds[VisualsSettings.HitSoundType]
+            if soundId then
+                HitSound.SoundId = soundId
+                HitSound:Play()
+            end
+        end
+        lastHealth = health
+    end)
+end
+
+local function OnPlayerAdded(plr)
+    if plr == LocalPlayer then return end
+    if plr.Character then
+        TrackPlayerCharacter(plr.Character)
+    end
+    plr.CharacterAdded:Connect(TrackPlayerCharacter)
+end
+
+for _, p in pairs(Players:GetPlayers()) do OnPlayerAdded(p) end
+Players.PlayerAdded:Connect(OnPlayerAdded)
+
+---------------------------------------------------------
+-- MOBILE ON-SCREEN INVERTER BUTTON (HUD)
+---------------------------------------------------------
+
 local MobileInverterBtn = Instance.new("TextButton")
 MobileInverterBtn.Name = "InverterButton"
-MobileInverterBtn.Size = UDim2.new(0, 48, 0, 48)
+MobileInverterBtn.Size = UDim2.new(0, 50, 0, 50)
 MobileInverterBtn.Position = UDim2.new(0.85, 0, 0.4, 0)
 MobileInverterBtn.BackgroundColor3 = DarkTheme.TopBarBg
 MobileInverterBtn.BorderColor3 = DarkTheme.Accent
@@ -296,14 +554,90 @@ MobileInverterBtn.TextSize = 13
 MobileInverterBtn.Font = DarkTheme.Font
 MobileInverterBtn.Parent = ScreenGui
 
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(1, 0)
+BtnCorner.Parent = MobileInverterBtn
+
 MobileInverterBtn.MouseButton1Click:Connect(function()
     AntiAimSettings.InvertSide = not AntiAimSettings.InvertSide
     MobileInverterBtn.BorderColor3 = AntiAimSettings.InvertSide and Color3.fromRGB(0, 255, 120) or DarkTheme.Accent
 end)
 
--- FPS Loop
+---------------------------------------------------------
+-- ANTI-AIM ENGINE
+---------------------------------------------------------
+
+local currentAngle = 0
+
+RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+    if root and hum and hum.Health > 0 then
+        if AntiAimSettings.Enabled then
+            hum.AutoRotate = false
+
+            local baseYaw = AntiAimSettings.InvertSide and 90 or -90
+            if AntiAimSettings.BaseDirection == "backwards" then baseYaw = baseYaw + 180 end
+
+            local finalYaw = baseYaw
+            if AntiAimSettings.Style == "spin" then
+                currentAngle = (currentAngle + 20) % 360
+                finalYaw = baseYaw + currentAngle
+            elseif AntiAimSettings.Style == "jitter" then
+                finalYaw = baseYaw + math.random(-45, 45)
+            end
+
+            local pitchAngle = 0
+            if AntiAimSettings.Pitch == "down" then pitchAngle = -89
+            elseif AntiAimSettings.Pitch == "up" then pitchAngle = 89 end
+
+            local camYaw = math.atan2(-Camera.CFrame.LookVector.X, -Camera.CFrame.LookVector.Z)
+            root.CFrame = CFrame.new(root.Position)
+                * CFrame.Angles(0, camYaw + math.rad(finalYaw), 0)
+                * CFrame.Angles(math.rad(pitchAngle), 0, 0)
+        else
+            hum.AutoRotate = true
+        end
+    end
+end)
+
+---------------------------------------------------------
+-- MOVEMENT ENGINE
+---------------------------------------------------------
+
+RunService.Stepped:Connect(function()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+
+    if char and hum and root then
+        hum.WalkSpeed = RageSettings.StrafeSpeed
+
+        if RageSettings.BunnyHop and hum.FloorMaterial ~= Enum.Material.Air then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+
+        if RageSettings.NoClip then
+            for _, part in ipairs(char:GetChildren()) do
+                if part:IsA("BasePart") then part.CanCollide = false end
+            end
+        end
+
+        if RageSettings.AntiVoid and root.Position.Y < -50 then
+            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 100, root.AssemblyLinearVelocity.Z)
+        end
+    end
+end)
+
+---------------------------------------------------------
+-- FPS COUNTER & WATERMARK LOGIC
+---------------------------------------------------------
+
 local frameCount = 0
 local lastFpsUpdate = os.clock()
+
 RunService.RenderStepped:Connect(function()
     frameCount = frameCount + 1
     local now = os.clock()
@@ -315,7 +649,10 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Dragging System
+---------------------------------------------------------
+-- DRAGGING LOGIC (TOUCH & MOUSE)
+---------------------------------------------------------
+
 local dragging, dragInput, dragStart, startPos
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -323,9 +660,11 @@ TopBar.InputBegan:Connect(function(input)
         input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
     end
 end)
+
 TopBar.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
 end)
+
 UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
         local delta = input.Position - dragStart

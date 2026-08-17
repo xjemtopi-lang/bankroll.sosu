@@ -696,13 +696,16 @@ local function GetTargetPlayer()
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
     if not myRoot then return nil end
 
+    local vp = Camera.ViewportSize
+    local viewportCenter = Vector2.new(vp.X / 2, vp.Y / 2)
+
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
             local targetPart = plr.Character:FindFirstChild(Config.Ragebot.TargetPart) or plr.Character:FindFirstChild("Head")
             if targetPart then
                 local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
                 if onScreen then
-                    local mouseDist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                    local mouseDist = (Vector2.new(screenPos.X, screenPos.Y) - viewportCenter).Magnitude
                     if mouseDist <= Config.Ragebot.FOV then
                         local metric = mouseDist
                         if Config.Ragebot.TargetSelection == "Distance" then
@@ -733,9 +736,19 @@ local function FireWeapon()
 end
 
 local lastRageTick = 0
+local lastFovVal = -1
+
 RunService.RenderStepped:Connect(function()
-    FOVCircle.Visible = Config.Ragebot.ShowFOVCircle
-    FOVCircle.Size = UDim2.new(0, Config.Ragebot.FOV * 2, 0, Config.Ragebot.FOV * 2)
+    -- Performance: only update FOV circle properties when state/value changes
+    local showFov = Config.Ragebot.ShowFOVCircle
+    if FOVCircle.Visible ~= showFov then
+        FOVCircle.Visible = showFov
+    end
+    if showFov and lastFovVal ~= Config.Ragebot.FOV then
+        lastFovVal = Config.Ragebot.FOV
+        local diameter = lastFovVal * 2
+        FOVCircle.Size = UDim2.new(0, diameter, 0, diameter)
+    end
 
     if not Config.Ragebot.Enabled then return end
 
@@ -861,6 +874,9 @@ local ESPFolder = Instance.new("Folder")
 ESPFolder.Name = "BankrollESP"
 ESPFolder.Parent = ScreenGui
 
+-- Performance: cache ESP elements by player to eliminate per-frame FindFirstChild lookups and string concat
+local espCache = {}
+
 local function CreatePlayerESP(plr)
     if plr == LocalPlayer then return end
 
@@ -890,53 +906,66 @@ local function CreatePlayerESP(plr)
     WeaponLabel.TextSize = 9
     WeaponLabel.Font = Enum.Font.Code
     WeaponLabel.Parent = Box
+
+    espCache[plr] = {
+        Box = Box,
+        HealthBar = HealthBar,
+        WeaponLabel = WeaponLabel
+    }
+end
+
+local function RemovePlayerESP(plr)
+    local espData = espCache[plr]
+    if espData then
+        if espData.Box then
+            espData.Box:Destroy()
+        end
+        espCache[plr] = nil
+    end
 end
 
 for _, p in pairs(Players:GetPlayers()) do CreatePlayerESP(p) end
 Players.PlayerAdded:Connect(CreatePlayerESP)
+Players.PlayerRemoving:Connect(RemovePlayerESP)
 
 RunService.RenderStepped:Connect(function()
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer then
-            local box = ESPFolder:FindFirstChild("Box_" .. plr.Name)
-            if box then
-                local char = plr.Character
-                local root = char and char:FindFirstChild("HumanoidRootPart")
-                local hum = char and char:FindFirstChildOfClass("Humanoid")
+    for plr, espData in pairs(espCache) do
+        local box = espData.Box
+        local char = plr.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
 
-                if char and root and hum and hum.Health > 0 and Config.Visuals.BoxESP then
-                    local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
-                    if onScreen then
-                        local head = char:FindFirstChild("Head")
-                        local headPos = head and Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0)) or screenPos
-                        local legPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
+        if char and root and hum and hum.Health > 0 and Config.Visuals.BoxESP then
+            local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+            if onScreen then
+                local head = char:FindFirstChild("Head")
+                local headPos = head and Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0)) or screenPos
+                local legPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
 
-                        local height = math.abs(headPos.Y - legPos.Y)
-                        local width = height / 2
+                local height = math.abs(headPos.Y - legPos.Y)
+                local width = height / 2
 
-                        box.Size = UDim2.new(0, width, 0, height)
-                        box.Position = UDim2.new(0, screenPos.X - width/2, 0, screenPos.Y - height/2)
-                        box.Visible = true
+                box.Size = UDim2.new(0, width, 0, height)
+                box.Position = UDim2.new(0, screenPos.X - width/2, 0, screenPos.Y - height/2)
+                box.Visible = true
 
-                        local hpBar = box:FindFirstChild("Health")
-                        if hpBar then
-                            hpBar.Visible = Config.Visuals.HealthBar
-                            hpBar.Size = UDim2.new(0, 3, math.clamp(hum.Health / hum.MaxHealth, 0, 1), 0)
-                        end
-
-                        local wpn = box:FindFirstChild("Weapon")
-                        if wpn then
-                            wpn.Visible = Config.Visuals.WeaponText
-                            local tool = char:FindFirstChildOfClass("Tool")
-                            wpn.Text = tool and tool.Name or ""
-                        end
-                    else
-                        box.Visible = false
-                    end
-                else
-                    box.Visible = false
+                local hpBar = espData.HealthBar
+                if hpBar then
+                    hpBar.Visible = Config.Visuals.HealthBar
+                    hpBar.Size = UDim2.new(0, 3, math.clamp(hum.Health / hum.MaxHealth, 0, 1), 0)
                 end
+
+                local wpn = espData.WeaponLabel
+                if wpn then
+                    wpn.Visible = Config.Visuals.WeaponText
+                    local tool = char:FindFirstChildOfClass("Tool")
+                    wpn.Text = tool and tool.Name or ""
+                end
+            else
+                box.Visible = false
             end
+        else
+            box.Visible = false
         end
     end
 end)

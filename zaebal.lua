@@ -18,6 +18,20 @@ local Stats = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local Camera = Workspace.CurrentCamera
 
+-- Localized performance utilities (eliminates global table lookups in hot per-frame loops)
+local math_rad = math.rad
+local math_atan2 = math.atan2
+local math_random = math.random
+local math_floor = math.floor
+local math_clamp = math.clamp
+local math_abs = math.abs
+local math_huge = math.huge
+local os_clock = os.clock
+local CFrame_new = CFrame.new
+local CFrame_Angles = CFrame.Angles
+local Vector3_new = Vector3.new
+local Vector2_new = Vector2.new
+
 -- Parent GUI setup with safe execution for Mobile Executors
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BankrollGui_" .. math.random(1000, 9999)
@@ -803,10 +817,11 @@ RunService.RenderStepped:Connect(function()
             if Config.AntiAim.Pitch == "down" then pitchAngle = -89
             elseif Config.AntiAim.Pitch == "up" then pitchAngle = 89 end
 
-            local camYaw = math.atan2(-Camera.CFrame.LookVector.X, -Camera.CFrame.LookVector.Z)
-            root.CFrame = CFrame.new(root.Position)
-                * CFrame.Angles(0, camYaw + math.rad(finalYaw), 0)
-                * CFrame.Angles(math.rad(pitchAngle), 0, 0)
+            -- Localized CFrame and math function calls reduce per-frame overhead
+            local camYaw = math_atan2(-Camera.CFrame.LookVector.X, -Camera.CFrame.LookVector.Z)
+            root.CFrame = CFrame_new(root.Position)
+                * CFrame_Angles(0, camYaw + math_rad(finalYaw), 0)
+                * CFrame_Angles(math_rad(pitchAngle), 0, 0)
         else
             root.Anchored = false
             hum.AutoRotate = true
@@ -833,7 +848,7 @@ RunService.Stepped:Connect(function()
         if Config.Movement.AutoStrafe and hum.FloorMaterial == Enum.Material.Air then
             local moveVector = hum.MoveDirection
             if moveVector.Magnitude > 0 then
-                root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(moveVector.X * 2), 0)
+                root.CFrame = root.CFrame * CFrame_Angles(0, math_rad(moveVector.X * 2), 0)
             end
         end
 

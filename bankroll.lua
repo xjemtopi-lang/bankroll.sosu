@@ -11,6 +11,17 @@ local InsertService = game:GetService("InsertService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
+-- Localized global functions and constructors for per-frame performance
+local math_rad = math.rad
+local math_atan2 = math.atan2
+local math_floor = math.floor
+local math_random = math.random
+local tick = tick
+local string_format = string.format
+local CFrame_new = CFrame.new
+local CFrame_fromEulerAnglesYXZ = CFrame.fromEulerAnglesYXZ
+local Vector3_new = Vector3.new
+
 -- Parent GUI setup
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BankrollGui"
@@ -611,8 +622,9 @@ RunService.RenderStepped:Connect(function()
     frameCount = frameCount + 1
     local now = tick()
     if now - lastFpsUpdate >= 0.5 then
-        local fps = math.floor(frameCount / (now - lastFpsUpdate))
-        Watermark.Text = string.format(" bankroll.sosu | %d fps", fps)
+        -- Fast FPS formatting using localized math and string functions
+        local fps = math_floor(frameCount / (now - lastFpsUpdate))
+        Watermark.Text = string_format(" bankroll.sosu | %d fps", fps)
         frameCount = 0
         lastFpsUpdate = now
     end
@@ -702,17 +714,17 @@ RunService.RenderStepped:Connect(function()
             currentAngle = (currentAngle + 20) % 360
             finalYaw = baseYaw + currentAngle
         elseif AntiAimSettings.Style == "jitter" then
-            finalYaw = baseYaw + math.random(-45, 45)
+            finalYaw = baseYaw + math_random(-45, 45)
         end
 
         local pitchAngle = 0
         if AntiAimSettings.Pitch == "down" then pitchAngle = -89
         elseif AntiAimSettings.Pitch == "up" then pitchAngle = 89 end
 
-        local camYaw = math.atan2(-Camera.CFrame.LookVector.X, -Camera.CFrame.LookVector.Z)
-        root.CFrame = CFrame.new(root.Position) 
-            * CFrame.Angles(0, camYaw + math.rad(finalYaw), 0)
-            * CFrame.Angles(math.rad(pitchAngle), 0, 0)
+        local camYaw = math_atan2(-Camera.CFrame.LookVector.X, -Camera.CFrame.LookVector.Z)
+        -- Optimization: Localized math/CFrame constructors and single YXZ Euler matrix creation
+        root.CFrame = CFrame_new(root.Position)
+            * CFrame_fromEulerAnglesYXZ(math_rad(pitchAngle), camYaw + math_rad(finalYaw), 0)
     end
 end)
 
@@ -739,7 +751,7 @@ RunService.Stepped:Connect(function()
         end
 
         if RageSettings.AntiVoid and root.Position.Y < -50 then
-            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 100, root.AssemblyLinearVelocity.Z)
+            root.AssemblyLinearVelocity = Vector3_new(root.AssemblyLinearVelocity.X, 100, root.AssemblyLinearVelocity.Z)
         end
     end
 end)

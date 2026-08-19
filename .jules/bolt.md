@@ -1,0 +1,3 @@
+## 2026-08-19 - Per-frame CFrame allocation and global lookup optimization in Luau
+**Learning:** In Luau/Roblox scripts, `RunService.RenderStepped` and `RunService.Stepped` run on every frame (60–120+ FPS). Calling global constructors (`CFrame.new`, `CFrame.Angles`, `Vector3.new`) and global math table lookups (`math.rad`, `math.atan2`) inside per-frame hooks introduces unnecessary table lookups and GC overhead. Multiplying two `CFrame.Angles` matrices per frame creates extra intermediate CFrame objects; using `CFrame.fromEulerAnglesYXZ` achieves the same orientation in a single allocation.
+**Action:** Always localize math/CFrame globals at module top-level and combine CFrame rotations using single Euler constructor methods for high-frequency frame loops.

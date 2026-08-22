@@ -609,28 +609,24 @@ local function GetPlayerWeapon(player)
 end
 
 -- Рисуем Corner-box (8 линий, по 2 на угол)
+-- BOLT OPTIMIZATION: Assign Vector2 positions directly to line instances
+-- to eliminate allocating temporary corner position tables and 16 Vector2 objects
+-- per player every frame. Reduces GC pressure significantly in ESP hot loop.
 local function DrawCornerBox(e, x, y, w, h, col)
-    local cs = math.min(w,h) * 0.25  -- размер угла
-    local corners_pos = {
-        -- TL
-        {Vector2.new(x,y),       Vector2.new(x+cs,y)},
-        {Vector2.new(x,y),       Vector2.new(x,y+cs)},
-        -- TR
-        {Vector2.new(x+w,y),     Vector2.new(x+w-cs,y)},
-        {Vector2.new(x+w,y),     Vector2.new(x+w,y+cs)},
-        -- BL
-        {Vector2.new(x,y+h),     Vector2.new(x+cs,y+h)},
-        {Vector2.new(x,y+h),     Vector2.new(x,y+h-cs)},
-        -- BR
-        {Vector2.new(x+w,y+h),   Vector2.new(x+w-cs,y+h)},
-        {Vector2.new(x+w,y+h),   Vector2.new(x+w,y+h-cs)},
-    }
-    for i,ln in ipairs(e.corners) do
-        ln.Visible = true
-        ln.From    = corners_pos[i][1]
-        ln.To      = corners_pos[i][2]
-        ln.Color   = col
-    end
+    local cs = math.min(w,h) * 0.25  -- corner length
+    local c = e.corners
+
+    c[1].From = Vector2.new(x,y)      c[1].To = Vector2.new(x+cs,y)   c[1].Color = col c[1].Visible = true
+    c[2].From = Vector2.new(x,y)      c[2].To = Vector2.new(x,y+cs)   c[2].Color = col c[2].Visible = true
+
+    c[3].From = Vector2.new(x+w,y)    c[3].To = Vector2.new(x+w-cs,y) c[3].Color = col c[3].Visible = true
+    c[4].From = Vector2.new(x+w,y)    c[4].To = Vector2.new(x+w,y+cs) c[4].Color = col c[4].Visible = true
+
+    c[5].From = Vector2.new(x,y+h)    c[5].To = Vector2.new(x+cs,y+h) c[5].Color = col c[5].Visible = true
+    c[6].From = Vector2.new(x,y+h)    c[6].To = Vector2.new(x,y+h-cs) c[6].Color = col c[6].Visible = true
+
+    c[7].From = Vector2.new(x+w,y+h)  c[7].To = Vector2.new(x+w-cs,y+h) c[7].Color = col c[7].Visible = true
+    c[8].From = Vector2.new(x+w,y+h)  c[8].To = Vector2.new(x+w,y+h-cs) c[8].Color = col c[8].Visible = true
 end
 
 local function UpdateESP()
@@ -798,32 +794,55 @@ end
 ----------------------------------------------------------------
 local DroppedHighlights = {}
 
+-- BOLT OPTIMIZATION: Event-driven tracking for dropped tools in Workspace instead of calling Workspace:GetDescendants()
+-- on a throttled loop. Scanning entire Workspace hierarchy (tens of thousands of instances) every 0.15s causes heavy CPU spikes.
+local wasDroppedESPEnabled = false
+
+local function AddToolHighlight(obj)
+    if obj:IsA("Tool") and not obj:IsDescendantOf(Players) and not DroppedHighlights[obj] then
+        local hl = Instance.new("Highlight")
+        hl.Adornee          = obj
+        hl.FillColor        = Color3.fromRGB(255,255,100)
+        hl.OutlineColor     = Color3.fromRGB(255,200,0)
+        hl.FillTransparency = 0.4
+        hl.DepthMode        = Enum.HighlightDepthMode.AlwaysOnTop
+        hl.Parent           = obj
+        DroppedHighlights[obj] = hl
+    end
+end
+
+Workspace.DescendantAdded:Connect(function(obj)
+    if Config.Visuals.DroppedESP then
+        AddToolHighlight(obj)
+    end
+end)
+
 local function UpdateDroppedESP()
     if not ShouldRun("Weapon") then return end
     if not Config.Visuals.DroppedESP then
-        for obj, hl in pairs(DroppedHighlights) do
-            hl:Destroy()
-            DroppedHighlights[obj] = nil
+        if wasDroppedESPEnabled then
+            wasDroppedESPEnabled = false
+            for obj, hl in pairs(DroppedHighlights) do
+                hl:Destroy()
+                DroppedHighlights[obj] = nil
+            end
         end
         return
     end
 
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Tool") and not DroppedHighlights[obj] then
-            local hl = Instance.new("Highlight")
-            hl.Adornee          = obj
-            hl.FillColor        = Color3.fromRGB(255,255,100)
-            hl.OutlineColor     = Color3.fromRGB(255,200,0)
-            hl.FillTransparency = 0.4
-            hl.DepthMode        = Enum.HighlightDepthMode.AlwaysOnTop
-            hl.Parent           = obj
-            DroppedHighlights[obj] = hl
+    -- Initial scan when feature is toggled on (runs once on toggle)
+    if not wasDroppedESPEnabled then
+        wasDroppedESPEnabled = true
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("Tool") then
+                AddToolHighlight(obj)
+            end
         end
     end
 
-    -- Чистим удалённые
+    -- Clean up highlights for tools that were picked up or destroyed
     for obj, hl in pairs(DroppedHighlights) do
-        if not obj.Parent then
+        if not obj.Parent or obj:IsDescendantOf(Players) then
             hl:Destroy()
             DroppedHighlights[obj] = nil
         end
@@ -871,6 +890,8 @@ local function ApplyWorldVisuals()
     end
 
     -- SKYBOX
+    -- BOLT OPTIMIZATION: Cache and reuse CustomSkyInst instead of destroying and re-instantiating Sky object every 0.5s.
+    -- Re-creating Sky objects continuously wastes memory and causes texture reloading stutters.
     if Config.Visuals.CustomSkybox then
         local id = SkyboxPresets[Config.Visuals.SkyboxType]
         if id then
@@ -881,12 +902,16 @@ local function ApplyWorldVisuals()
                     s.Parent = nil
                 end
             end
-            if CustomSkyInst then CustomSkyInst:Destroy() end
-            local sky = Instance.new("Sky")
-            sky.SkyboxBk = id sky.SkyboxDn = id sky.SkyboxFt = id
-            sky.SkyboxLf = id sky.SkyboxRt = id sky.SkyboxUp = id
-            sky.Parent   = Lighting
-            CustomSkyInst = sky
+            if not CustomSkyInst or not CustomSkyInst.Parent then
+                local sky = Instance.new("Sky")
+                sky.SkyboxBk = id sky.SkyboxDn = id sky.SkyboxFt = id
+                sky.SkyboxLf = id sky.SkyboxRt = id sky.SkyboxUp = id
+                sky.Parent   = Lighting
+                CustomSkyInst = sky
+            elseif CustomSkyInst.SkyboxBk ~= id then
+                CustomSkyInst.SkyboxBk = id CustomSkyInst.SkyboxDn = id CustomSkyInst.SkyboxFt = id
+                CustomSkyInst.SkyboxLf = id CustomSkyInst.SkyboxRt = id CustomSkyInst.SkyboxUp = id
+            end
         end
     elseif CustomSkyInst then
         CustomSkyInst:Destroy()

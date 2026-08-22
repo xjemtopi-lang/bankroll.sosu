@@ -1,0 +1,3 @@
+## 2026-08-22 - Avoid Workspace:GetDescendants() and Repeated Object Re-creation in Throttled Loops
+**Learning:** Calling `Workspace:GetDescendants()` inside throttled/render loops (even at 0.15s intervals) traverses tens of thousands of instances, causing heavy CPU frame spikes on mobile executors like Delta. Additionally, continually destroying and re-instantiating instances (like `Sky`) inside periodic update loops wastes memory and causes texture reloading stutters.
+**Action:** Use event-driven descendant listeners (`Workspace.DescendantAdded`) for tracking workspace objects, cache and reuse existing `Instance` objects, and assign vector/color properties directly without intermediate table allocations.

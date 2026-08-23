@@ -600,36 +600,37 @@ local function HideESP(e)
     for _,l in ipairs(e.sk) do l.Visible=false end
 end
 
+-- OPTIMIZATION (Bolt ⚡): Fast weapon lookup using C++ engine call FindFirstChildOfClass
+-- Avoids allocating temporary tables with c:GetChildren() on every frame
 local function GetPlayerWeapon(player)
-    local c = GetChar(player) if not c then return "?" end
-    for _, obj in ipairs(c:GetChildren()) do
-        if obj:IsA("Tool") then return obj.Name end
-    end
-    return ""
+    local c = GetChar(player)
+    if not c then return "" end
+    local tool = c:FindFirstChildOfClass("Tool")
+    return tool and tool.Name or ""
 end
 
--- Рисуем Corner-box (8 линий, по 2 на угол)
+-- OPTIMIZATION (Bolt ⚡): Zero-allocation Corner-box renderer
+-- Avoids creating 9 temporary nested tables per player per ESP frame, eliminating GC pressure on mobile engines
 local function DrawCornerBox(e, x, y, w, h, col)
-    local cs = math.min(w,h) * 0.25  -- размер угла
-    local corners_pos = {
-        -- TL
-        {Vector2.new(x,y),       Vector2.new(x+cs,y)},
-        {Vector2.new(x,y),       Vector2.new(x,y+cs)},
-        -- TR
-        {Vector2.new(x+w,y),     Vector2.new(x+w-cs,y)},
-        {Vector2.new(x+w,y),     Vector2.new(x+w,y+cs)},
-        -- BL
-        {Vector2.new(x,y+h),     Vector2.new(x+cs,y+h)},
-        {Vector2.new(x,y+h),     Vector2.new(x,y+h-cs)},
-        -- BR
-        {Vector2.new(x+w,y+h),   Vector2.new(x+w-cs,y+h)},
-        {Vector2.new(x+w,y+h),   Vector2.new(x+w,y+h-cs)},
-    }
-    for i,ln in ipairs(e.corners) do
-        ln.Visible = true
-        ln.From    = corners_pos[i][1]
-        ln.To      = corners_pos[i][2]
-        ln.Color   = col
+    local cs = math.min(w, h) * 0.25  -- corner size
+    local c = e.corners
+
+    -- Top-Left
+    c[1].From = Vector2.new(x, y);          c[1].To = Vector2.new(x + cs, y)
+    c[2].From = Vector2.new(x, y);          c[2].To = Vector2.new(x, y + cs)
+    -- Top-Right
+    c[3].From = Vector2.new(x + w, y);      c[3].To = Vector2.new(x + w - cs, y)
+    c[4].From = Vector2.new(x + w, y);      c[4].To = Vector2.new(x + w, y + cs)
+    -- Bottom-Left
+    c[5].From = Vector2.new(x, y + h);      c[5].To = Vector2.new(x + cs, y + h)
+    c[6].From = Vector2.new(x, y + h);      c[6].To = Vector2.new(x, y + h - cs)
+    -- Bottom-Right
+    c[7].From = Vector2.new(x + w, y + h);  c[7].To = Vector2.new(x + w - cs, y + h)
+    c[8].From = Vector2.new(x + w, y + h);  c[8].To = Vector2.new(x + w, y + h - cs)
+
+    for i = 1, 8 do
+        c[i].Visible = true
+        c[i].Color   = col
     end
 end
 

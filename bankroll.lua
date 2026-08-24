@@ -11,6 +11,15 @@ local InsertService = game:GetService("InsertService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
+-- Localize fast math/CFrame functions for per-frame upvalue performance
+local math_rad = math.rad
+local math_atan2 = math.atan2
+local math_random = math.random
+local math_floor = math.floor
+local CFrame_new = CFrame.new
+local CFrame_Angles = CFrame.Angles
+local os_clock = os.clock
+
 -- Parent GUI setup
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BankrollGui"
@@ -605,13 +614,13 @@ WmPadding.PaddingLeft = UDim.new(0, 8)
 WmPadding.Parent = Watermark
 
 local frameCount = 0
-local lastFpsUpdate = tick()
+local lastFpsUpdate = os_clock()
 
 RunService.RenderStepped:Connect(function()
     frameCount = frameCount + 1
-    local now = tick()
+    local now = os_clock()
     if now - lastFpsUpdate >= 0.5 then
-        local fps = math.floor(frameCount / (now - lastFpsUpdate))
+        local fps = math_floor(frameCount / (now - lastFpsUpdate))
         Watermark.Text = string.format(" bankroll.sosu | %d fps", fps)
         frameCount = 0
         lastFpsUpdate = now
@@ -702,17 +711,17 @@ RunService.RenderStepped:Connect(function()
             currentAngle = (currentAngle + 20) % 360
             finalYaw = baseYaw + currentAngle
         elseif AntiAimSettings.Style == "jitter" then
-            finalYaw = baseYaw + math.random(-45, 45)
+            finalYaw = math_random(-45, 45) + baseYaw
         end
 
         local pitchAngle = 0
         if AntiAimSettings.Pitch == "down" then pitchAngle = -89
         elseif AntiAimSettings.Pitch == "up" then pitchAngle = 89 end
 
-        local camYaw = math.atan2(-Camera.CFrame.LookVector.X, -Camera.CFrame.LookVector.Z)
-        root.CFrame = CFrame.new(root.Position) 
-            * CFrame.Angles(0, camYaw + math.rad(finalYaw), 0)
-            * CFrame.Angles(math.rad(pitchAngle), 0, 0)
+        local camYaw = math_atan2(-Camera.CFrame.LookVector.X, -Camera.CFrame.LookVector.Z)
+        root.CFrame = CFrame_new(root.Position)
+            * CFrame_Angles(0, camYaw + math_rad(finalYaw), 0)
+            * CFrame_Angles(math_rad(pitchAngle), 0, 0)
     end
 end)
 

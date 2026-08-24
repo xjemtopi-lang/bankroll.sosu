@@ -1,0 +1,3 @@
+## 2026-08-18 - Localize math/CFrame globals in Luau RenderStepped loops
+**Learning:** In Luau/Roblox scripts running on high-frequency per-frame events (`RenderStepped`, `Stepped`), looking up global tables (`math`, `CFrame`, `os`) on every frame causes repeated `GETGLOBAL` / `GETTABLEKS` opcode execution. Caching functions (`math.rad`, `math.atan2`, `math.random`, `CFrame.Angles`, `CFrame.new`, `os.clock`) into local upvalues outside loop callbacks eliminates dynamic global dictionary lookups and speeds up per-frame calculations.
+**Action:** Always localize globally accessed math, CFrame, and timer functions at the top of Lua module/script files when accessed inside per-frame handlers.

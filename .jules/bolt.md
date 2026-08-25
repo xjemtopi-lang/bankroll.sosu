@@ -1,0 +1,3 @@
+## 2026-08-25 - Roblox Lua Global Lookups and GUI Descendant Traversal
+**Learning:** In Luau/Roblox scripts running every frame (e.g., inside `RunService.RenderStepped` or `Stepped`), indexing global tables like `math` or `CFrame` repeatedly adds micro-overhead. Furthermore, methods like `ScreenGui:GetDescendants()` or `Workspace:GetDescendants()` recursively traverse entire Instance trees, causing notable frame drops when triggered during user interactions.
+**Action:** Always localize standard library functions (`math.floor`, `CFrame.new`, etc.) at top-level scope for high-frequency loops, and maintain explicit registered element arrays for batch GUI updates instead of traversing descendants.

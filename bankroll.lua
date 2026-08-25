@@ -11,6 +11,22 @@ local InsertService = game:GetService("InsertService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
+-- Fast local references for performance (avoids global table lookups in frame loops)
+local math_floor = math.floor
+local math_rad = math.rad
+local math_atan2 = math.atan2
+local math_random = math.random
+local CFrame_new = CFrame.new
+local CFrame_Angles = CFrame.Angles
+local os_clock = os.clock or tick
+
+-- GUI Text Objects Cache (avoids costly ScreenGui:GetDescendants() tree traversals)
+local registeredTextObjects = {}
+local function registerText(obj)
+    table.insert(registeredTextObjects, obj)
+    return obj
+end
+
 -- Parent GUI setup
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BankrollGui"
@@ -201,7 +217,7 @@ local function updateMask()
                     local weld = Instance.new("Weld")
                     weld.Part0 = head
                     weld.Part1 = handle
-                    weld.C0 = CFrame.new(0, 0, -0.1)
+                    weld.C0 = CFrame_new(0, 0, -0.1)
                     weld.Parent = handle
                     maskObj.Parent = char
                 end
@@ -230,7 +246,7 @@ TopBar.BorderSizePixel = 1
 TopBar.BorderColor3 = DarkTheme.Border
 TopBar.Parent = MainFrame
 
-local TitleLabel = Instance.new("TextLabel")
+local TitleLabel = registerText(Instance.new("TextLabel"))
 TitleLabel.Size = UDim2.new(1, 0, 1, 0)
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.Text = "bankroll | mobile hvh edition"
@@ -268,7 +284,7 @@ local function CreateGroupBox(parent, title, pos, size)
     Box.BorderColor3 = DarkTheme.Border; Box.BorderSizePixel = 1
     Box.Parent = parent
 
-    local Label = Instance.new("TextLabel")
+    local Label = registerText(Instance.new("TextLabel"))
     Label.Position = UDim2.new(0, 10, 0, -8); Label.BackgroundColor3 = DarkTheme.MainBg
     Label.Text = " " .. title .. " "; Label.TextColor3 = DarkTheme.TextDim; Label.TextSize = 11; Label.Font = DarkTheme.Font; Label.SizeToTextBounds = true
     Label.Parent = Box
@@ -279,7 +295,7 @@ local function CreateGroupBox(parent, title, pos, size)
 end
 
 local function CreateToggle(parent, text, defaultState, callback)
-    local ToggleBtn = Instance.new("TextButton")
+    local ToggleBtn = registerText(Instance.new("TextButton"))
     ToggleBtn.Size = UDim2.new(1, 0, 0, 18); ToggleBtn.BackgroundTransparency = 1; ToggleBtn.Text = ""; ToggleBtn.Parent = parent
 
     local Box = Instance.new("Frame")
@@ -287,7 +303,7 @@ local function CreateToggle(parent, text, defaultState, callback)
     Box.BackgroundColor3 = defaultState and DarkTheme.Accent or Color3.fromRGB(30, 30, 30)
     Box.BorderColor3 = DarkTheme.Border; Box.BorderSizePixel = 1; Box.Parent = ToggleBtn
 
-    local Text = Instance.new("TextLabel")
+    local Text = registerText(Instance.new("TextLabel"))
     Text.Size = UDim2.new(1, -20, 1, 0); Text.Position = UDim2.new(0, 20, 0, 0); Text.BackgroundTransparency = 1
     Text.Text = text; Text.TextColor3 = DarkTheme.Text; Text.TextSize = 11; Text.Font = DarkTheme.Font; Text.TextXAlignment = Enum.TextXAlignment.Left; Text.Parent = ToggleBtn
 
@@ -303,7 +319,7 @@ local function CreateSlider(parent, text, min, max, default, callback)
     local Container = Instance.new("Frame")
     Container.Size = UDim2.new(1, 0, 0, 26); Container.BackgroundTransparency = 1; Container.Parent = parent
 
-    local Label = Instance.new("TextLabel")
+    local Label = registerText(Instance.new("TextLabel"))
     Label.Size = UDim2.new(1, 0, 0, 12); Label.BackgroundTransparency = 1
     Label.Text = text .. ": " .. tostring(default); Label.TextColor3 = DarkTheme.Text; Label.TextSize = 11; Label.Font = DarkTheme.Font; Label.TextXAlignment = Enum.TextXAlignment.Left; Label.Parent = Container
 
@@ -318,7 +334,7 @@ local function CreateSlider(parent, text, min, max, default, callback)
     local sliding = false
     local function update(input)
         local pos = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
-        local val = math.floor(min + pos * (max - min))
+        local val = math_floor(min + pos * (max - min))
         Fill.Size = UDim2.new(pos, 0, 1, 0)
         Label.Text = text .. ": " .. tostring(val)
         pcall(callback, val)
@@ -339,10 +355,10 @@ local function CreateSelector(parent, labelText, options, defaultOption, callbac
     local Container = Instance.new("Frame")
     Container.Size = UDim2.new(1, 0, 0, 20); Container.BackgroundTransparency = 1; Container.Parent = parent
 
-    local Label = Instance.new("TextLabel")
+    local Label = registerText(Instance.new("TextLabel"))
     Label.Size = UDim2.new(0.45, 0, 1, 0); Label.BackgroundTransparency = 1; Label.Text = labelText; Label.TextColor3 = DarkTheme.Text; Label.TextSize = 11; Label.Font = DarkTheme.Font; Label.TextXAlignment = Enum.TextXAlignment.Left; Label.Parent = Container
 
-    local Button = Instance.new("TextButton")
+    local Button = registerText(Instance.new("TextButton"))
     Button.Size = UDim2.new(0.55, 0, 1, 0); Button.Position = UDim2.new(0.45, 0, 0, 0)
     Button.BackgroundColor3 = Color3.fromRGB(25, 25, 25); Button.BorderColor3 = DarkTheme.Border; Button.BorderSizePixel = 1; Button.Text = defaultOption; Button.TextColor3 = DarkTheme.Accent; Button.TextSize = 11; Button.Font = DarkTheme.Font; Button.Parent = Container
 
@@ -367,7 +383,7 @@ local tabs = {
 }
 
 for i, tab in ipairs(tabs) do
-    local TabButton = Instance.new("TextButton")
+    local TabButton = registerText(Instance.new("TextButton"))
     TabButton.Size = UDim2.new(1/#tabs, 0, 1, 0); TabButton.Position = UDim2.new((i-1)/#tabs, 0, 0, 0)
     TabButton.BackgroundTransparency = 1; TabButton.Text = tab.Name
     TabButton.TextColor3 = (i == 1) and DarkTheme.Text or DarkTheme.TextDim; TabButton.TextSize = 12; TabButton.Font = DarkTheme.Font; TabButton.Parent = TabBar
@@ -453,10 +469,9 @@ local UIConfigBox = CreateGroupBox(SettingsTab, "ui settings", UDim2.new(0, 0, 0
 CreateSelector(UIConfigBox, "font", {"Code", "SourceSansBold", "GothamBold", "Arcade"}, MenuSettings.SelectedFont, function(selected)
     MenuSettings.SelectedFont = selected
     local fontEnum = Enum.Font[selected] or Enum.Font.Code
-    for _, obj in ipairs(ScreenGui:GetDescendants()) do
-        if obj:IsA("TextLabel") or obj:IsA("TextButton") then
-            obj.Font = fontEnum
-        end
+    -- Fast iteration over cached text objects list instead of calling ScreenGui:GetDescendants()
+    for _, obj in ipairs(registeredTextObjects) do
+        obj.Font = fontEnum
     end
 end)
 
@@ -472,7 +487,7 @@ end)
 
 local CommunityBox = CreateGroupBox(SettingsTab, "community", UDim2.new(0.52, 0, 0, 0), UDim2.new(0.48, 0, 1, 0))
 
-local TGLabel = Instance.new("TextLabel")
+local TGLabel = registerText(Instance.new("TextLabel"))
 TGLabel.Size = UDim2.new(1, 0, 0, 18)
 TGLabel.BackgroundTransparency = 1
 TGLabel.Text = "Telegram: @bankrollc"
@@ -482,7 +497,7 @@ TGLabel.Font = DarkTheme.Font
 TGLabel.TextXAlignment = Enum.TextXAlignment.Left
 TGLabel.Parent = CommunityBox
 
-local CopyBtn = Instance.new("TextButton")
+local CopyBtn = registerText(Instance.new("TextButton"))
 CopyBtn.Size = UDim2.new(1, 0, 0, 22)
 CopyBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 CopyBtn.BorderColor3 = DarkTheme.Border
@@ -515,7 +530,7 @@ LoaderFrame.BorderColor3 = DarkTheme.Accent
 LoaderFrame.BorderSizePixel = 1
 LoaderFrame.Parent = ScreenGui
 
-local LoaderTitle = Instance.new("TextLabel")
+local LoaderTitle = registerText(Instance.new("TextLabel"))
 LoaderTitle.Size = UDim2.new(1, 0, 0, 30)
 LoaderTitle.Position = UDim2.new(0, 0, 0, 10)
 LoaderTitle.BackgroundTransparency = 1
@@ -525,7 +540,7 @@ LoaderTitle.TextSize = 16
 LoaderTitle.Font = Enum.Font.Code
 LoaderTitle.Parent = LoaderFrame
 
-local LoaderStatus = Instance.new("TextLabel")
+local LoaderStatus = registerText(Instance.new("TextLabel"))
 LoaderStatus.Size = UDim2.new(1, -20, 0, 20)
 LoaderStatus.Position = UDim2.new(0, 10, 0, 45)
 LoaderStatus.BackgroundTransparency = 1
@@ -586,7 +601,7 @@ end)
 -- WATERMARK & TOGGLE BUTTON LOGIC
 ---------------------------------------------------------
 
-local Watermark = Instance.new("TextButton")
+local Watermark = registerText(Instance.new("TextButton"))
 Watermark.Name = "WatermarkToggle"
 Watermark.Position = UDim2.new(0, 15, 0, 15)
 Watermark.Size = UDim2.new(0, 170, 0, 22)
@@ -605,13 +620,13 @@ WmPadding.PaddingLeft = UDim.new(0, 8)
 WmPadding.Parent = Watermark
 
 local frameCount = 0
-local lastFpsUpdate = tick()
+local lastFpsUpdate = os_clock()
 
 RunService.RenderStepped:Connect(function()
     frameCount = frameCount + 1
-    local now = tick()
+    local now = os_clock()
     if now - lastFpsUpdate >= 0.5 then
-        local fps = math.floor(frameCount / (now - lastFpsUpdate))
+        local fps = math_floor(frameCount / (now - lastFpsUpdate))
         Watermark.Text = string.format(" bankroll.sosu | %d fps", fps)
         frameCount = 0
         lastFpsUpdate = now
@@ -658,7 +673,7 @@ Players.PlayerAdded:Connect(OnPlayerAdded)
 -- MOBILE ON-SCREEN INVERTER BUTTON (HUD)
 ---------------------------------------------------------
 
-local MobileInverterBtn = Instance.new("TextButton")
+local MobileInverterBtn = registerText(Instance.new("TextButton"))
 MobileInverterBtn.Name = "InverterButton"
 MobileInverterBtn.Size = UDim2.new(0, 50, 0, 50)
 MobileInverterBtn.Position = UDim2.new(0.85, 0, 0.4, 0)
@@ -702,17 +717,17 @@ RunService.RenderStepped:Connect(function()
             currentAngle = (currentAngle + 20) % 360
             finalYaw = baseYaw + currentAngle
         elseif AntiAimSettings.Style == "jitter" then
-            finalYaw = baseYaw + math.random(-45, 45)
+            finalYaw = baseYaw + math_random(-45, 45)
         end
 
         local pitchAngle = 0
         if AntiAimSettings.Pitch == "down" then pitchAngle = -89
         elseif AntiAimSettings.Pitch == "up" then pitchAngle = 89 end
 
-        local camYaw = math.atan2(-Camera.CFrame.LookVector.X, -Camera.CFrame.LookVector.Z)
-        root.CFrame = CFrame.new(root.Position) 
-            * CFrame.Angles(0, camYaw + math.rad(finalYaw), 0)
-            * CFrame.Angles(math.rad(pitchAngle), 0, 0)
+        local camYaw = math_atan2(-Camera.CFrame.LookVector.X, -Camera.CFrame.LookVector.Z)
+        root.CFrame = CFrame_new(root.Position)
+            * CFrame_Angles(0, camYaw + math_rad(finalYaw), 0)
+            * CFrame_Angles(math_rad(pitchAngle), 0, 0)
     end
 end)
 

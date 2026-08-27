@@ -861,8 +861,12 @@ local ESPFolder = Instance.new("Folder")
 ESPFolder.Name = "BankrollESP"
 ESPFolder.Parent = ScreenGui
 
+-- Performance optimization: Cache ESP GUI component references in table
+-- Avoids O(N) FindFirstChild calls and string concatenations on every RenderStepped frame
+local ESPCache = {}
+
 local function CreatePlayerESP(plr)
-    if plr == LocalPlayer then return end
+    if plr == LocalPlayer or ESPCache[plr] then return end
 
     local Box = Instance.new("Frame")
     Box.Name = "Box_" .. plr.Name
@@ -890,53 +894,64 @@ local function CreatePlayerESP(plr)
     WeaponLabel.TextSize = 9
     WeaponLabel.Font = Enum.Font.Code
     WeaponLabel.Parent = Box
+
+    ESPCache[plr] = {
+        Box = Box,
+        Health = HealthBar,
+        Weapon = WeaponLabel
+    }
+end
+
+local function RemovePlayerESP(plr)
+    local data = ESPCache[plr]
+    if data then
+        if data.Box then data.Box:Destroy() end
+        ESPCache[plr] = nil
+    end
 end
 
 for _, p in pairs(Players:GetPlayers()) do CreatePlayerESP(p) end
 Players.PlayerAdded:Connect(CreatePlayerESP)
+Players.PlayerRemoving:Connect(RemovePlayerESP)
 
 RunService.RenderStepped:Connect(function()
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer then
-            local box = ESPFolder:FindFirstChild("Box_" .. plr.Name)
-            if box then
-                local char = plr.Character
-                local root = char and char:FindFirstChild("HumanoidRootPart")
-                local hum = char and char:FindFirstChildOfClass("Humanoid")
+    for plr, esp in pairs(ESPCache) do
+        local box = esp.Box
+        local char = plr.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
 
-                if char and root and hum and hum.Health > 0 and Config.Visuals.BoxESP then
-                    local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
-                    if onScreen then
-                        local head = char:FindFirstChild("Head")
-                        local headPos = head and Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0)) or screenPos
-                        local legPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
+        if char and root and hum and hum.Health > 0 and Config.Visuals.BoxESP then
+            local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+            if onScreen then
+                local head = char:FindFirstChild("Head")
+                local headPos = head and Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0)) or screenPos
+                local legPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
 
-                        local height = math.abs(headPos.Y - legPos.Y)
-                        local width = height / 2
+                local height = math.abs(headPos.Y - legPos.Y)
+                local width = height / 2
 
-                        box.Size = UDim2.new(0, width, 0, height)
-                        box.Position = UDim2.new(0, screenPos.X - width/2, 0, screenPos.Y - height/2)
-                        box.Visible = true
+                box.Size = UDim2.new(0, width, 0, height)
+                box.Position = UDim2.new(0, screenPos.X - width/2, 0, screenPos.Y - height/2)
+                box.Visible = true
 
-                        local hpBar = box:FindFirstChild("Health")
-                        if hpBar then
-                            hpBar.Visible = Config.Visuals.HealthBar
-                            hpBar.Size = UDim2.new(0, 3, math.clamp(hum.Health / hum.MaxHealth, 0, 1), 0)
-                        end
-
-                        local wpn = box:FindFirstChild("Weapon")
-                        if wpn then
-                            wpn.Visible = Config.Visuals.WeaponText
-                            local tool = char:FindFirstChildOfClass("Tool")
-                            wpn.Text = tool and tool.Name or ""
-                        end
-                    else
-                        box.Visible = false
-                    end
-                else
-                    box.Visible = false
+                local hpBar = esp.Health
+                hpBar.Visible = Config.Visuals.HealthBar
+                if Config.Visuals.HealthBar then
+                    hpBar.Size = UDim2.new(0, 3, math.clamp(hum.Health / hum.MaxHealth, 0, 1), 0)
                 end
+
+                local wpn = esp.Weapon
+                wpn.Visible = Config.Visuals.WeaponText
+                if Config.Visuals.WeaponText then
+                    local tool = char:FindFirstChildOfClass("Tool")
+                    wpn.Text = tool and tool.Name or ""
+                end
+            else
+                box.Visible = false
             end
+        else
+            box.Visible = false
         end
     end
 end)

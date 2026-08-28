@@ -1,0 +1,3 @@
+## 2026-08-28 - Localizing Global Functions for Luau Per-Frame Loops
+**Learning:** In Luau/Roblox environments, accessing global tables (`math`, `CFrame`, `Vector3`) inside high-frequency event loops like `RunService.RenderStepped` or `RunService.Stepped` causes repeated global table lookup overhead (`GETGLOBAL` / `GETTABLEKS` instructions). Localizing these references at the script scope replaces global lookups with fast local register accesses (`GETUPVAL` / `GETLOCAL`).
+**Action:** Always cache global math functions (`math.rad`, `math.atan2`, `math.floor`, `math.random`) and core constructors (`CFrame.new`, `CFrame.Angles`, `Vector3.new`) as local variables at the top of the script when they are called inside per-frame or high-frequency loops.

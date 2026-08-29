@@ -861,6 +861,10 @@ local ESPFolder = Instance.new("Folder")
 ESPFolder.Name = "BankrollESP"
 ESPFolder.Parent = ScreenGui
 
+-- ⚡ Bolt Optimization: Cache ESP UI instances per player to avoid expensive FindFirstChild string lookups inside RenderStepped (60-144 FPS loop).
+-- Expected impact: Eliminates O(N*3) FindFirstChild calls per frame, reducing CPU overhead and frame time on mobile executors.
+local EspCache = {}
+
 local function CreatePlayerESP(plr)
     if plr == LocalPlayer then return end
 
@@ -890,16 +894,39 @@ local function CreatePlayerESP(plr)
     WeaponLabel.TextSize = 9
     WeaponLabel.Font = Enum.Font.Code
     WeaponLabel.Parent = Box
+
+    EspCache[plr] = {
+        box = Box,
+        hpBar = HealthBar,
+        wpn = WeaponLabel
+    }
+end
+
+local function RemovePlayerESP(plr)
+    local cached = EspCache[plr]
+    if cached then
+        if cached.box then
+            cached.box:Destroy()
+        end
+        EspCache[plr] = nil
+    end
 end
 
 for _, p in pairs(Players:GetPlayers()) do CreatePlayerESP(p) end
 Players.PlayerAdded:Connect(CreatePlayerESP)
+Players.PlayerRemoving:Connect(RemovePlayerESP)
 
 RunService.RenderStepped:Connect(function()
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer then
-            local box = ESPFolder:FindFirstChild("Box_" .. plr.Name)
-            if box then
+            local cached = EspCache[plr]
+            if not cached then
+                CreatePlayerESP(plr)
+                cached = EspCache[plr]
+            end
+
+            if cached and cached.box then
+                local box = cached.box
                 local char = plr.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
                 local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -918,13 +945,13 @@ RunService.RenderStepped:Connect(function()
                         box.Position = UDim2.new(0, screenPos.X - width/2, 0, screenPos.Y - height/2)
                         box.Visible = true
 
-                        local hpBar = box:FindFirstChild("Health")
+                        local hpBar = cached.hpBar
                         if hpBar then
                             hpBar.Visible = Config.Visuals.HealthBar
                             hpBar.Size = UDim2.new(0, 3, math.clamp(hum.Health / hum.MaxHealth, 0, 1), 0)
                         end
 
-                        local wpn = box:FindFirstChild("Weapon")
+                        local wpn = cached.wpn
                         if wpn then
                             wpn.Visible = Config.Visuals.WeaponText
                             local tool = char:FindFirstChildOfClass("Tool")

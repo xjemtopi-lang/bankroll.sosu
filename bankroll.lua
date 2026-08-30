@@ -685,6 +685,9 @@ end)
 ---------------------------------------------------------
 
 local currentAngle = 0
+-- Precomputed pitch constants in radians to avoid math.rad calls per frame
+local PITCH_DOWN_RAD = math.rad(-89)
+local PITCH_UP_RAD = math.rad(89)
 
 RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
@@ -692,7 +695,10 @@ RunService.RenderStepped:Connect(function()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
 
     if AntiAimSettings.Enabled and root and hum and hum.Health > 0 then
-        hum.AutoRotate = false
+        -- Performance: Only set AutoRotate if true to avoid redundant C++ bridge property updates
+        if hum.AutoRotate then
+            hum.AutoRotate = false
+        end
 
         local baseYaw = AntiAimSettings.InvertSide and 90 or -90
         if AntiAimSettings.BaseDirection == "backwards" then baseYaw = baseYaw + 180 end
@@ -705,14 +711,21 @@ RunService.RenderStepped:Connect(function()
             finalYaw = baseYaw + math.random(-45, 45)
         end
 
-        local pitchAngle = 0
-        if AntiAimSettings.Pitch == "down" then pitchAngle = -89
-        elseif AntiAimSettings.Pitch == "up" then pitchAngle = 89 end
+        local pitchRad = 0
+        if AntiAimSettings.Pitch == "down" then
+            pitchRad = PITCH_DOWN_RAD
+        elseif AntiAimSettings.Pitch == "up" then
+            pitchRad = PITCH_UP_RAD
+        end
 
-        local camYaw = math.atan2(-Camera.CFrame.LookVector.X, -Camera.CFrame.LookVector.Z)
+        local camLook = Camera.CFrame.LookVector
+        local camYaw = math.atan2(-camLook.X, -camLook.Z)
         root.CFrame = CFrame.new(root.Position) 
             * CFrame.Angles(0, camYaw + math.rad(finalYaw), 0)
-            * CFrame.Angles(math.rad(pitchAngle), 0, 0)
+            * CFrame.Angles(pitchRad, 0, 0)
+    elseif hum and not hum.AutoRotate then
+        -- Restore AutoRotate when Anti-Aim is disabled
+        hum.AutoRotate = true
     end
 end)
 
@@ -726,7 +739,10 @@ RunService.Stepped:Connect(function()
     local root = char and char:FindFirstChild("HumanoidRootPart")
 
     if char and hum and root then
-        hum.WalkSpeed = RageSettings.StrafeSpeed
+        -- Performance: Avoid setting WalkSpeed every frame if unchanged, reducing C++ property bridge overhead
+        if hum.WalkSpeed ~= RageSettings.StrafeSpeed then
+            hum.WalkSpeed = RageSettings.StrafeSpeed
+        end
 
         if RageSettings.BunnyHop and hum.FloorMaterial ~= Enum.Material.Air then
             hum:ChangeState(Enum.HumanoidStateType.Jumping)
@@ -734,7 +750,10 @@ RunService.Stepped:Connect(function()
 
         if RageSettings.NoClip then
             for _, part in ipairs(char:GetChildren()) do
-                if part:IsA("BasePart") then part.CanCollide = false end
+                -- Performance: Only update CanCollide if currently true to prevent unnecessary C++ engine calls
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
+                end
             end
         end
 

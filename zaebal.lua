@@ -768,7 +768,8 @@ RunService.RenderStepped:Connect(function()
 
     if root and hum and hum.Health > 0 then
         if Config.AntiAim.Enabled then
-            hum.AutoRotate = false
+            -- Guard property assignment to eliminate Luau-to-C++ bridge overhead on every frame
+            if hum.AutoRotate ~= false then hum.AutoRotate = false end
 
             if Config.AntiAim.FakeLag then
                 lagCount = (lagCount + 1) % Config.AntiAim.FakeLagLimit
@@ -809,7 +810,7 @@ RunService.RenderStepped:Connect(function()
                 * CFrame.Angles(math.rad(pitchAngle), 0, 0)
         else
             root.Anchored = false
-            hum.AutoRotate = true
+            if not hum.AutoRotate then hum.AutoRotate = true end
         end
     end
 end)

@@ -692,7 +692,8 @@ RunService.RenderStepped:Connect(function()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
 
     if AntiAimSettings.Enabled and root and hum and hum.Health > 0 then
-        hum.AutoRotate = false
+        -- Guard property assignment to eliminate Luau-to-C++ bridge overhead on every frame
+        if hum.AutoRotate ~= false then hum.AutoRotate = false end
 
         local baseYaw = AntiAimSettings.InvertSide and 90 or -90
         if AntiAimSettings.BaseDirection == "backwards" then baseYaw = baseYaw + 180 end
